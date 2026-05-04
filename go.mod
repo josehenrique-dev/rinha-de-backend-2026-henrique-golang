@@ -1,11 +1,14 @@
-module github.com/henriquefernandes/rinha-2026
+module github.com/josehenrique-dev/rinha-2026
 
 go 1.24.6
 
 require (
+	github.com/coder/hnsw v0.6.1
+	github.com/goccy/go-json v0.10.6
+)
+
+require (
 	github.com/chewxy/math32 v1.10.1 // indirect
-	github.com/coder/hnsw v0.6.1 // indirect
-	github.com/goccy/go-json v0.10.6 // indirect
 	github.com/google/renameio v1.0.1 // indirect
 	github.com/viterin/partial v1.1.0 // indirect
 	github.com/viterin/vek v0.4.2 // indirect
