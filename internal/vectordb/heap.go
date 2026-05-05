@@ -3,6 +3,7 @@ package vectordb
 import (
 	"container/heap"
 	"math"
+	"sort"
 )
 
 type heapItem struct {
@@ -77,6 +78,20 @@ func (h *resultHeap) len() int { return len(h.items) }
 func (h *resultHeap) ids() []uint32 {
 	out := make([]uint32, len(h.items))
 	for i, it := range h.items {
+		out[i] = it.id
+	}
+	return out
+}
+
+// sortedIDs returns node IDs sorted by distance ascending (closest first).
+// Used during build so that candidates[0] is the closest entry point
+// and selectNeighbors picks the M truly nearest nodes.
+func (h *resultHeap) sortedIDs() []uint32 {
+	items := make([]heapItem, len(h.items))
+	copy(items, h.items)
+	sort.Slice(items, func(i, j int) bool { return items[i].dist < items[j].dist })
+	out := make([]uint32, len(items))
+	for i, it := range items {
 		out[i] = it.id
 	}
 	return out
