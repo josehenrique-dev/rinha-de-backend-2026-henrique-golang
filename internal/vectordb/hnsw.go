@@ -1,47 +1,53 @@
 package vectordb
 
 import (
-	"math"
+	"fmt"
 
-	"github.com/coder/hnsw"
 	"github.com/josehenrique-dev/rinha-2026/internal/loader"
 )
 
-type Index struct {
-	graph *hnsw.Graph[uint32]
-	ds    *loader.Dataset
-}
+const (
+	defaultM              = 8
+	defaultEfConstruction = 100
+	defaultEfSearch       = 20
+)
 
-func euclidean(a, b []float32) float32 {
-	var sum float32
-	for i := range a {
-		d := a[i] - b[i]
-		sum += d * d
-	}
-	return float32(math.Sqrt(float64(sum)))
+type Index struct {
+	g        *graph
+	indexMem []byte
 }
 
 func Build(ds *loader.Dataset) (*Index, error) {
-	g := hnsw.NewGraph[uint32]()
-	g.M = 16
-	g.Distance = euclidean
+	g := buildGraph(ds.Vectors, ds.Labels, ds.Count, ds.Dim, defaultM, defaultEfConstruction)
+	return &Index{g: g}, nil
+}
 
-	for i := 0; i < ds.Count; i++ {
-		vec := ds.Vectors[i*ds.Dim : i*ds.Dim+ds.Dim]
-		g.Add(hnsw.MakeNode(uint32(i), vec))
+func Save(idx *Index, path string) error {
+	if err := saveGraph(idx.g, path); err != nil {
+		return fmt.Errorf("save graph: %w", err)
 	}
+	return nil
+}
 
-	return &Index{graph: g, ds: ds}, nil
+func Load(path string, ds *loader.Dataset) (*Index, error) {
+	g, mem, err := loadGraph(path, ds.Vectors, ds.Labels, ds.Dim)
+	if err != nil {
+		return nil, fmt.Errorf("load graph: %w", err)
+	}
+	return &Index{g: g, indexMem: mem}, nil
 }
 
 func (idx *Index) Search(query [14]float32, k int) float32 {
-	neighbors := idx.graph.Search(query[:], k)
-
+	results := idx.g.search(query[:], k, defaultEfSearch)
 	fraudCount := 0
-	for _, n := range neighbors {
-		if idx.ds.Labels[n.Key] == 1 {
+	for _, id := range results {
+		if idx.g.labels[id] == 1 {
 			fraudCount++
 		}
 	}
 	return float32(fraudCount) / float32(k)
+}
+
+func (idx *Index) Close() {
+	freeMmap(idx.indexMem)
 }
