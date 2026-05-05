@@ -202,7 +202,7 @@ func (g *graph) searchLayer(query []float32, ep uint32, ef, layer int) []uint32 
 			}
 		}
 	}
-	return res.ids()
+	return res.sortedIDs()
 }
 
 func (g *graph) selectNeighbors(candidates []uint32, M int) []uint32 {
