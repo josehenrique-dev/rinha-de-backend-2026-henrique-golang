@@ -14,7 +14,11 @@ type refEntry struct {
 	Label  string    `json:"label"`
 }
 
-func Preprocess(srcGzPath, vectorsDst, labelsDst string) error {
+// fraudRatio is the fraction of the budget allocated to fraud vectors.
+// Increase fraud coverage to reduce FN (weight=3) at modest cost in FP (weight=1).
+const fraudRatio = 0.55
+
+func Preprocess(srcGzPath, vectorsDst, labelsDst string, maxVectors int) error {
 	f, err := os.Open(srcGzPath)
 	if err != nil {
 		return fmt.Errorf("open gz: %w", err)
@@ -32,6 +36,33 @@ func Preprocess(srcGzPath, vectorsDst, labelsDst string) error {
 		return fmt.Errorf("decode json: %w", err)
 	}
 
+	var fraudEntries, legitEntries []refEntry
+	for _, e := range entries {
+		if e.Label == "fraud" {
+			fraudEntries = append(fraudEntries, e)
+		} else {
+			legitEntries = append(legitEntries, e)
+		}
+	}
+
+	fraudBudget := int(float64(maxVectors) * fraudRatio)
+	if fraudBudget > len(fraudEntries) {
+		fraudBudget = len(fraudEntries)
+	}
+	legitBudget := maxVectors - fraudBudget
+	if legitBudget > len(legitEntries) {
+		legitBudget = len(legitEntries)
+	}
+
+	fraudStep := 1
+	if len(fraudEntries) > fraudBudget {
+		fraudStep = len(fraudEntries) / fraudBudget
+	}
+	legitStep := 1
+	if len(legitEntries) > legitBudget {
+		legitStep = len(legitEntries) / legitBudget
+	}
+
 	vf, err := os.Create(vectorsDst)
 	if err != nil {
 		return err
@@ -45,19 +76,39 @@ func Preprocess(srcGzPath, vectorsDst, labelsDst string) error {
 	defer lf.Close()
 
 	buf := make([]byte, 4)
-	for _, e := range entries {
+	writeEntry := func(e refEntry, label uint8) error {
 		for _, v := range e.Vector {
 			binary.LittleEndian.PutUint32(buf, math.Float32bits(v))
 			if _, err := vf.Write(buf); err != nil {
 				return err
 			}
 		}
-		label := uint8(0)
-		if e.Label == "fraud" {
-			label = 1
+		_, err := lf.Write([]byte{label})
+		return err
+	}
+
+	// Interleave fraud and legit for balanced HNSW graph connectivity.
+	fi, li := 0, 0
+	fraudWritten, legitWritten := 0, 0
+	for fi < len(fraudEntries) || li < len(legitEntries) {
+		if fi < len(fraudEntries) && (fraudStep == 1 || fi%fraudStep == 0) && fraudWritten < fraudBudget {
+			if err := writeEntry(fraudEntries[fi], 1); err != nil {
+				return err
+			}
+			fraudWritten++
 		}
-		if _, err := lf.Write([]byte{label}); err != nil {
-			return err
+		fi++
+
+		if li < len(legitEntries) && (legitStep == 1 || li%legitStep == 0) && legitWritten < legitBudget {
+			if err := writeEntry(legitEntries[li], 0); err != nil {
+				return err
+			}
+			legitWritten++
+		}
+		li++
+
+		if fraudWritten >= fraudBudget && legitWritten >= legitBudget {
+			break
 		}
 	}
 	return nil
