@@ -28,6 +28,64 @@ func (idx *Index) Close() {
 	}
 }
 
+type knnHeap struct {
+	buf    [5]struct{ d int32; i uint32 }
+	n      int
+	worstD int32
+	worstP int
+}
+
+func newKnnHeap(k int) knnHeap {
+	return knnHeap{worstD: 1<<31 - 1}
+}
+
+func (h *knnHeap) push(d int32, i uint32) {
+	if h.n < len(h.buf) {
+		h.buf[h.n] = struct{ d int32; i uint32 }{d, i}
+		h.n++
+		if h.n == len(h.buf) {
+			h.worstP = 0
+			for j := 1; j < h.n; j++ {
+				if h.buf[j].d > h.buf[h.worstP].d {
+					h.worstP = j
+				}
+			}
+			h.worstD = h.buf[h.worstP].d
+		}
+	} else if d < h.worstD {
+		h.buf[h.worstP] = struct{ d int32; i uint32 }{d, i}
+		h.worstP = 0
+		for j := 1; j < h.n; j++ {
+			if h.buf[j].d > h.buf[h.worstP].d {
+				h.worstP = j
+			}
+		}
+		h.worstD = h.buf[h.worstP].d
+	}
+}
+
+func (h *knnHeap) fraudCount(labs []uint8) int {
+	fc := 0
+	for i := range h.n {
+		if labs[h.buf[i].i] == 1 {
+			fc++
+		}
+	}
+	return fc
+}
+
+func (idx *Index) scanInto(qi [Dim]int16, clusters []int, h *knnHeap) {
+	for _, c := range clusters {
+		start := idx.offsets[c]
+		sz := idx.sizes[c]
+		base := idx.vecs[start*Dim:]
+		for vi := uint32(0); vi < sz; vi++ {
+			d := distInt16(qi, base[vi*Dim:])
+			h.push(d, start+vi)
+		}
+	}
+}
+
 func (idx *Index) SearchCount(query [Dim]float32, k int) int {
 	var qi [Dim]int16
 	for i, x := range query {
@@ -43,9 +101,13 @@ func (idx *Index) SearchCount(query [Dim]float32, k int) int {
 	var topC [80]int
 	idx.topCentroids(query, &topC)
 
-	fc := idx.scan(qi, k, topC[:20])
+	h := newKnnHeap(k)
+	idx.scanInto(qi, topC[:20], &h)
+	fc := h.fraudCount(idx.labs)
+
 	if fc >= 1 && fc <= 4 {
-		fc = idx.scan(qi, k, topC[:80])
+		idx.scanInto(qi, topC[20:80], &h)
+		fc = h.fraudCount(idx.labs)
 	}
 	return fc
 }
@@ -101,56 +163,6 @@ func (idx *Index) topCentroids(query [Dim]float32, out *[80]int) {
 	}
 }
 
-func (idx *Index) scan(qi [Dim]int16, k int, clusters []int) int {
-	type cand struct {
-		d int32
-		i uint32
-	}
-	var buf [5]cand
-	for i := range buf {
-		buf[i].d = 1<<31 - 1
-	}
-	n, worstD, worstP := 0, int32(1<<31-1), 0
-
-	for _, c := range clusters {
-		start := idx.offsets[c]
-		sz := idx.sizes[c]
-		base := idx.vecs[start*Dim:]
-		for vi := uint32(0); vi < sz; vi++ {
-			d := distInt16(qi, base[vi*Dim:])
-			if n < k {
-				buf[n] = cand{d, start + vi}
-				n++
-				if n == k {
-					worstP = 0
-					for i := 1; i < k; i++ {
-						if buf[i].d > buf[worstP].d {
-							worstP = i
-						}
-					}
-					worstD = buf[worstP].d
-				}
-			} else if d < worstD {
-				buf[worstP] = cand{d, start + vi}
-				worstP = 0
-				for i := 1; i < k; i++ {
-					if buf[i].d > buf[worstP].d {
-						worstP = i
-					}
-				}
-				worstD = buf[worstP].d
-			}
-		}
-	}
-
-	fc := 0
-	for i := 0; i < n; i++ {
-		if idx.labs[buf[i].i] == 1 {
-			fc++
-		}
-	}
-	return fc
-}
 
 func distArrayCent(q [Dim]float32, c *[Dim]float32) float32 {
 	d0 := q[0] - c[0]
