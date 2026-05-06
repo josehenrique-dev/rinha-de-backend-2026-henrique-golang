@@ -2,12 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 
-"github.com/josehenrique-dev/rinha-2026/internal/handler"
+	"github.com/josehenrique-dev/rinha-2026/internal/handler"
 	"github.com/josehenrique-dev/rinha-2026/internal/loader"
 	"github.com/josehenrique-dev/rinha-2026/internal/service"
 	"github.com/josehenrique-dev/rinha-2026/internal/vectordb"
@@ -22,6 +22,7 @@ func main() {
 	indexPath := env("INDEX_PATH", "/data/index.bin")
 	mccRiskPath := env("MCC_RISK_PATH", "/data/mcc_risk.json")
 	normPath := env("NORMALIZATION_PATH", "/data/normalization.json")
+	socketPath := env("SOCKET_PATH", "")
 	port := env("PORT", "8080")
 
 	ds, err := loader.Load(vectorsPath, labelsPath, dim)
@@ -56,8 +57,26 @@ func main() {
 	mux.HandleFunc("GET /ready", h.Ready)
 	mux.HandleFunc("POST /fraud-score", h.FraudScore)
 
-	log.Printf("listening on :%s", port)
-	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), mux); err != nil {
+	var ln net.Listener
+	if socketPath != "" {
+		os.Remove(socketPath)
+		ln, err = net.Listen("unix", socketPath)
+		if err != nil {
+			log.Fatalf("listen unix %s: %v", socketPath, err)
+		}
+		if err := os.Chmod(socketPath, 0666); err != nil {
+			log.Fatalf("chmod socket: %v", err)
+		}
+		log.Printf("listening on unix:%s", socketPath)
+	} else {
+		ln, err = net.Listen("tcp", ":"+port)
+		if err != nil {
+			log.Fatalf("listen tcp :%s: %v", port, err)
+		}
+		log.Printf("listening on :%s", port)
+	}
+
+	if err := http.Serve(ln, mux); err != nil {
 		log.Fatalf("server: %v", err)
 	}
 }
