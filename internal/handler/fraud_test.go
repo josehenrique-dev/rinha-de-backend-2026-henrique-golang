@@ -110,7 +110,7 @@ func TestFraudScore_LargeBody(t *testing.T) {
 			CardPresent bool    `json:"card_present"`
 			KmFromHome  float32 `json:"km_from_home"`
 		} `json:"terminal"`
-		LastTransaction interface{} `json:"last_transaction"`
+		LastTransaction any `json:"last_transaction"`
 	}
 
 	var payload txBody
