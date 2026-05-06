@@ -255,7 +255,7 @@ func (g *graph) connectNeighbors(id uint32, neighbors []uint32, layer int) {
 	}
 }
 
-func (g *graph) addNeighborIfSlot(nodeID, newNeighbor uint32, M, layer int) {
+func (g *graph) addNeighborIfSlot(nodeID, newNeighbor uint32, _, layer int) {
 	var slots []uint32
 	if layer == 0 {
 		slots = g.layer0Neighbors(nodeID)
