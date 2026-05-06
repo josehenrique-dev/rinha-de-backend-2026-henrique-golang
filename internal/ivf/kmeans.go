@@ -59,7 +59,7 @@ func trainCentroids(vectors []float32, nVectors int) [NClusters][Dim]float32 {
 
 	chunkSize := (nVectors + nWorkers - 1) / nWorkers
 
-	for iter := 0; iter < 15; iter++ {
+	for iter := 0; iter < 20; iter++ {
 		var wg sync.WaitGroup
 		for w := 0; w < nWorkers; w++ {
 			wg.Add(1)
