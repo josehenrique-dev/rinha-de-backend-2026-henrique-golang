@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	defaultM              = 12
+	defaultM              = 8
 	defaultEfConstruction = 200
 	defaultEfSearch       = 5
 )
