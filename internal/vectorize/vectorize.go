@@ -1,6 +1,9 @@
 package vectorize
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type Normalization struct {
 	MaxAmount            float32
@@ -48,6 +51,26 @@ type Payload struct {
 	Merchant        Merchant
 	Terminal        Terminal
 	LastTransaction *LastTransaction
+}
+
+func parseHourWeekday(s string) (hour, weekday int, err error) {
+	if len(s) < 19 {
+		return 0, 0, fmt.Errorf("rfc3339 too short")
+	}
+	h := int(s[11]-'0')*10 + int(s[12]-'0')
+	if h < 0 || h > 23 {
+		return 0, 0, fmt.Errorf("invalid hour")
+	}
+	year := int(s[0]-'0')*1000 + int(s[1]-'0')*100 + int(s[2]-'0')*10 + int(s[3]-'0')
+	month := int(s[5]-'0')*10 + int(s[6]-'0')
+	day := int(s[8]-'0')*10 + int(s[9]-'0')
+	t := [12]int{0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4}
+	if month < 3 {
+		year--
+	}
+	dow := (year + year/4 - year/100 + year/400 + t[month-1] + day) % 7
+	wd := (dow + 6) % 7
+	return h, wd, nil
 }
 
 func clamp(v float32) float32 {
