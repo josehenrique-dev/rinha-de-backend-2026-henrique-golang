@@ -2,6 +2,7 @@ package vectorize
 
 import (
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -84,12 +85,7 @@ func clamp(v float32) float32 {
 }
 
 func isKnownMerchant(id string, known []string) bool {
-	for _, m := range known {
-		if m == id {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(known, id)
 }
 
 func Vectorize(p Payload, mccRisk map[string]float32, norm Normalization) [14]float32 {
