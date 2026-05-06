@@ -3,13 +3,12 @@ package ivf
 import (
 	"fmt"
 	"log"
-	"math/rand"
 	"syscall"
 )
 
 const (
 	Dim       = 14
-	NClusters = 1024
+	NClusters = 2048
 	scaleF    = float32(32767)
 )
 
@@ -41,22 +40,22 @@ func (idx *Index) SearchCount(query [Dim]float32, k int) int {
 		qi[i] = int16(v)
 	}
 
-	var topC [24]int
+	var topC [50]int
 	idx.topCentroids(query, &topC)
 
-	fc := idx.scan(qi, k, topC[:5])
-	if fc == 2 || fc == 3 {
-		fc = idx.scan(qi, k, topC[:24])
+	fc := idx.scan(qi, k, topC[:10])
+	if fc >= 1 && fc <= 4 {
+		fc = idx.scan(qi, k, topC[:50])
 	}
 	return fc
 }
 
-func (idx *Index) topCentroids(query [Dim]float32, out *[24]int) {
+func (idx *Index) topCentroids(query [Dim]float32, out *[50]int) {
 	type entry struct {
 		d float32
 		c int
 	}
-	var best [24]entry
+	var best [50]entry
 	n := len(out)
 	filled := 0
 	worstD := float32(1e38)
@@ -201,28 +200,17 @@ func Build(vectors []float32, labels []uint8, nVectors int) (*Index, error) {
 		return nil, fmt.Errorf("no vectors")
 	}
 
-	rng := rand.New(rand.NewSource(42))
-
-	log.Printf("training k-means: %d clusters on sample of %d vectors...", NClusters, min(nVectors, 200000))
-	centroids := trainCentroids(vectors, nVectors, rng)
+	log.Printf("training k-means: %d clusters on all %d vectors (parallel)...", NClusters, nVectors)
+	centroids := trainCentroids(vectors, nVectors)
 	log.Println("k-means done")
 
 	log.Printf("assigning %d vectors to clusters...", nVectors)
 	assignments := make([]uint16, nVectors)
-	var sizes [NClusters]uint32
+	assignParallel(vectors, nVectors, &centroids, assignments)
 
-	for i := 0; i < nVectors; i++ {
-		vec := vectors[i*Dim : (i+1)*Dim]
-		best, bestD := 0, float32(1e38)
-		for c := 0; c < NClusters; c++ {
-			d := distSliceCent(vec, &centroids[c])
-			if d < bestD {
-				bestD = d
-				best = c
-			}
-		}
-		assignments[i] = uint16(best)
-		sizes[best]++
+	var sizes [NClusters]uint32
+	for _, c := range assignments {
+		sizes[c]++
 	}
 
 	var offsets [NClusters]uint32
