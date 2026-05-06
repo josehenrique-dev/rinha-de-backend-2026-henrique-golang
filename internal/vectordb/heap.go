@@ -1,16 +1,13 @@
 package vectordb
 
-import (
-	"container/heap"
-	"math"
-	"sort"
-)
+import "sort"
 
 type heapItem struct {
 	id   uint32
 	dist float32
 }
 
+// candidateHeap is a min-heap ordered by dist (closest first).
 type candidateHeap struct {
 	items []heapItem
 }
@@ -19,30 +16,57 @@ func newCandidateHeap(cap int) *candidateHeap {
 	return &candidateHeap{items: make([]heapItem, 0, cap)}
 }
 
-func (h *candidateHeap) Len() int           { return len(h.items) }
-func (h *candidateHeap) Less(i, j int) bool { return h.items[i].dist < h.items[j].dist }
-func (h *candidateHeap) Swap(i, j int)      { h.items[i], h.items[j] = h.items[j], h.items[i] }
-func (h *candidateHeap) Push(x any)         { h.items = append(h.items, x.(heapItem)) }
-func (h *candidateHeap) Pop() any {
-	n := len(h.items)
-	x := h.items[n-1]
-	h.items = h.items[:n-1]
-	return x
-}
+func (h *candidateHeap) reset() { h.items = h.items[:0] }
+
 func (h *candidateHeap) push(id uint32, dist float32) {
-	heap.Push(h, heapItem{id, dist})
+	h.items = append(h.items, heapItem{id, dist})
+	h.siftUp(len(h.items) - 1)
 }
+
 func (h *candidateHeap) popMin() heapItem {
-	return heap.Pop(h).(heapItem)
-}
-func (h *candidateHeap) peekMin() float32 {
-	if len(h.items) == 0 {
-		return math.MaxFloat32
+	top := h.items[0]
+	n := len(h.items) - 1
+	h.items[0] = h.items[n]
+	h.items = h.items[:n]
+	if n > 0 {
+		h.siftDown(0)
 	}
-	return h.items[0].dist
+	return top
 }
+
 func (h *candidateHeap) empty() bool { return len(h.items) == 0 }
 
+func (h *candidateHeap) siftUp(i int) {
+	for i > 0 {
+		parent := (i - 1) >> 1
+		if h.items[i].dist >= h.items[parent].dist {
+			break
+		}
+		h.items[i], h.items[parent] = h.items[parent], h.items[i]
+		i = parent
+	}
+}
+
+func (h *candidateHeap) siftDown(i int) {
+	n := len(h.items)
+	for {
+		left := (i << 1) + 1
+		if left >= n {
+			break
+		}
+		j := left
+		if right := left + 1; right < n && h.items[right].dist < h.items[left].dist {
+			j = right
+		}
+		if h.items[i].dist <= h.items[j].dist {
+			break
+		}
+		h.items[i], h.items[j] = h.items[j], h.items[i]
+		i = j
+	}
+}
+
+// resultHeap is a max-heap ordered by dist (farthest at root), capped at cap entries.
 type resultHeap struct {
 	items []heapItem
 	cap   int
@@ -52,29 +76,66 @@ func newResultHeap(k int) *resultHeap {
 	return &resultHeap{items: make([]heapItem, 0, k+1), cap: k}
 }
 
-func (h *resultHeap) Len() int           { return len(h.items) }
-func (h *resultHeap) Less(i, j int) bool { return h.items[i].dist > h.items[j].dist }
-func (h *resultHeap) Swap(i, j int)      { h.items[i], h.items[j] = h.items[j], h.items[i] }
-func (h *resultHeap) Push(x any)         { h.items = append(h.items, x.(heapItem)) }
-func (h *resultHeap) Pop() any {
-	n := len(h.items)
-	x := h.items[n-1]
-	h.items = h.items[:n-1]
-	return x
-}
+func (h *resultHeap) reset() { h.items = h.items[:0] }
+
 func (h *resultHeap) push(id uint32, dist float32) {
-	heap.Push(h, heapItem{id, dist})
+	h.items = append(h.items, heapItem{id, dist})
+	h.siftUp(len(h.items) - 1)
 	if len(h.items) > h.cap {
-		heap.Pop(h)
+		h.popMax()
 	}
 }
+
+func (h *resultHeap) popMax() heapItem {
+	top := h.items[0]
+	n := len(h.items) - 1
+	h.items[0] = h.items[n]
+	h.items = h.items[:n]
+	if n > 0 {
+		h.siftDown(0)
+	}
+	return top
+}
+
 func (h *resultHeap) worst() float32 {
 	if len(h.items) < h.cap {
 		return 1e38
 	}
 	return h.items[0].dist
 }
+
 func (h *resultHeap) len() int { return len(h.items) }
+
+func (h *resultHeap) siftUp(i int) {
+	for i > 0 {
+		parent := (i - 1) >> 1
+		if h.items[i].dist <= h.items[parent].dist {
+			break
+		}
+		h.items[i], h.items[parent] = h.items[parent], h.items[i]
+		i = parent
+	}
+}
+
+func (h *resultHeap) siftDown(i int) {
+	n := len(h.items)
+	for {
+		left := (i << 1) + 1
+		if left >= n {
+			break
+		}
+		j := left
+		if right := left + 1; right < n && h.items[right].dist > h.items[left].dist {
+			j = right
+		}
+		if h.items[i].dist >= h.items[j].dist {
+			break
+		}
+		h.items[i], h.items[j] = h.items[j], h.items[i]
+		i = j
+	}
+}
+
 func (h *resultHeap) ids() []uint32 {
 	out := make([]uint32, len(h.items))
 	for i, it := range h.items {
@@ -83,9 +144,6 @@ func (h *resultHeap) ids() []uint32 {
 	return out
 }
 
-// sortedIDs returns node IDs sorted by distance ascending (closest first).
-// Used during build so that candidates[0] is the closest entry point
-// and selectNeighbors picks the M truly nearest nodes.
 func (h *resultHeap) sortedIDs() []uint32 {
 	items := make([]heapItem, len(h.items))
 	copy(items, h.items)

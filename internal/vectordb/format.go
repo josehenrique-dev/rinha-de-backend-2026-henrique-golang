@@ -133,6 +133,12 @@ func loadGraph(path string, vectors []float32, labels []uint8, dim int) (*graph,
 	g.pool = sync.Pool{
 		New: func() any { return newVisitedTracker(nodeCount) },
 	}
+	g.candPool = sync.Pool{
+		New: func() any { return newCandidateHeap(defaultEfSearch * 2) },
+	}
+	g.resPool = sync.Pool{
+		New: func() any { return newResultHeap(5) },
+	}
 
 	return g, mem, nil
 }

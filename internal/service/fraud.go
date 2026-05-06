@@ -20,3 +20,8 @@ func (s *FraudService) Score(p vectorize.Payload) (bool, float32) {
 	score := s.index.Search(vec, 5)
 	return score < 0.6, score
 }
+
+func (s *FraudService) FraudCount(p vectorize.Payload) int {
+	vec := vectorize.Vectorize(p, s.mccRisk, s.norm)
+	return s.index.SearchCount(vec, 5)
+}

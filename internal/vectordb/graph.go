@@ -21,6 +21,8 @@ type graph struct {
 	entryPoint uint32
 	maxLayer   int
 	pool       sync.Pool
+	candPool   sync.Pool
+	resPool    sync.Pool
 }
 
 type upperNode struct {
@@ -50,6 +52,13 @@ func buildGraph(vectors []float32, labels []uint8, nodeCount, dim, M, efConstruc
 
 	g.pool = sync.Pool{
 		New: func() any { return newVisitedTracker(nodeCount) },
+	}
+	efSearch := defaultEfConstruction
+	g.candPool = sync.Pool{
+		New: func() any { return newCandidateHeap(efSearch * 2) },
+	}
+	g.resPool = sync.Pool{
+		New: func() any { return newResultHeap(5) },
 	}
 
 	for i := 0; i < nodeCount; i++ {
@@ -304,8 +313,13 @@ func (g *graph) search(query []float32, k, efSearch int) []uint32 {
 	vt := g.pool.Get().(*visitedTracker)
 	defer func() { vt.reset(); g.pool.Put(vt) }()
 
-	cands := newCandidateHeap(efSearch * 2)
-	res := newResultHeap(k)
+	cands := g.candPool.Get().(*candidateHeap)
+	cands.reset()
+	defer g.candPool.Put(cands)
+
+	res := g.resPool.Get().(*resultHeap)
+	res.reset()
+	defer g.resPool.Put(res)
 
 	d := squaredDist(query, g.vec(ep))
 	cands.push(ep, d)
@@ -333,6 +347,59 @@ func (g *graph) search(query []float32, k, efSearch int) []uint32 {
 		}
 	}
 	return res.ids()
+}
+
+func (g *graph) searchInto(query []float32, efSearch int, out []uint32) int {
+	ep := g.entryPoint
+	for l := g.maxLayer; l > 0; l-- {
+		ep = g.greedyClosest(ep, query, l)
+	}
+
+	vt := g.pool.Get().(*visitedTracker)
+	defer func() { vt.reset(); g.pool.Put(vt) }()
+
+	cands := g.candPool.Get().(*candidateHeap)
+	cands.reset()
+	defer g.candPool.Put(cands)
+
+	res := g.resPool.Get().(*resultHeap)
+	res.reset()
+	defer g.resPool.Put(res)
+
+	d := squaredDist(query, g.vec(ep))
+	cands.push(ep, d)
+	res.push(ep, d)
+	vt.visit(ep)
+
+	for !cands.empty() {
+		c := cands.popMin()
+		if c.dist > res.worst() {
+			break
+		}
+		for _, n := range g.layer0Neighbors(c.id) {
+			if n == sentinel {
+				break
+			}
+			if vt.isVisited(n) {
+				continue
+			}
+			vt.visit(n)
+			nd := squaredDist(query, g.vec(n))
+			if nd <= res.worst() {
+				cands.push(n, nd)
+				res.push(n, nd)
+			}
+		}
+	}
+
+	n := len(res.items)
+	if n > len(out) {
+		n = len(out)
+	}
+	for i := 0; i < n; i++ {
+		out[i] = res.items[i].id
+	}
+	return n
 }
 
 func minInt(a, b int) int {
