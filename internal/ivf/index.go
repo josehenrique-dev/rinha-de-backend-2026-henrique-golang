@@ -35,7 +35,7 @@ type knnHeap struct {
 	worstP int
 }
 
-func newKnnHeap(k int) knnHeap {
+func newKnnHeap() knnHeap {
 	return knnHeap{worstD: 1<<31 - 1}
 }
 
@@ -79,7 +79,7 @@ func (idx *Index) scanInto(qi [Dim]int16, clusters []int, h *knnHeap) {
 		start := idx.offsets[c]
 		sz := idx.sizes[c]
 		base := idx.vecs[start*Dim:]
-		for vi := uint32(0); vi < sz; vi++ {
+		for vi := range sz {
 			d := distInt16(qi, base[vi*Dim:])
 			h.push(d, start+vi)
 		}
@@ -101,7 +101,7 @@ func (idx *Index) SearchCount(query [Dim]float32, k int) int {
 	var topC [80]int
 	idx.topCentroids(query, &topC)
 
-	h := newKnnHeap(k)
+	h := newKnnHeap()
 	idx.scanInto(qi, topC[:20], &h)
 	fc := h.fraudCount(idx.labs)
 
@@ -123,7 +123,7 @@ func (idx *Index) topCentroids(query [Dim]float32, out *[80]int) {
 	worstD := float32(1e38)
 	worstP := 0
 
-	for c := 0; c < NClusters; c++ {
+	for c := range NClusters {
 		d := distArrayCent(query, &idx.centroids[c])
 		if filled < n {
 			best[filled] = entry{d, c}
@@ -158,7 +158,7 @@ func (idx *Index) topCentroids(query [Dim]float32, out *[80]int) {
 		}
 		best[j+1] = key
 	}
-	for i := 0; i < filled; i++ {
+	for i := range filled {
 		out[i] = best[i].c
 	}
 }
@@ -227,7 +227,7 @@ func Build(vectors []float32, labels []uint8, nVectors int) (*Index, error) {
 
 	var offsets [NClusters]uint32
 	var off uint32
-	for c := 0; c < NClusters; c++ {
+	for c := range NClusters {
 		offsets[c] = off
 		off += sizes[c]
 	}
@@ -237,12 +237,12 @@ func Build(vectors []float32, labels []uint8, nVectors int) (*Index, error) {
 	cursor := make([]uint32, NClusters)
 	copy(cursor[:], offsets[:])
 
-	for i := 0; i < nVectors; i++ {
+	for i := range nVectors {
 		c := int(assignments[i])
 		slot := cursor[c]
 		src := vectors[i*Dim : (i+1)*Dim]
 		dst := vecs[slot*Dim : (slot+1)*Dim]
-		for d := 0; d < Dim; d++ {
+		for d := range Dim {
 			v := src[d] * scaleF
 			if v > scaleF {
 				v = scaleF
