@@ -7,9 +7,9 @@ import (
 )
 
 const (
-	defaultM              = 8
-	defaultEfConstruction = 100
-	defaultEfSearch       = 20
+	defaultM              = 10
+	defaultEfConstruction = 200
+	defaultEfSearch       = 50
 )
 
 type Index struct {
