@@ -40,8 +40,7 @@ func TestDistInt16_Correctness(t *testing.T) {
 func BenchmarkDistInt16(b *testing.B) {
 	q := [Dim]int16{100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400}
 	v := []int16{50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700}
-	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		distInt16(q, v)
 	}
 }
