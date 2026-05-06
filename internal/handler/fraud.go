@@ -65,7 +65,7 @@ func init() {
 
 var bodyPool = sync.Pool{
 	New: func() any {
-		b := make([]byte, 0, 1024)
+		b := make([]byte, 2048)
 		return &b
 	},
 }
@@ -76,23 +76,21 @@ func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) FraudScore(w http.ResponseWriter, r *http.Request) {
 	bufPtr := bodyPool.Get().(*[]byte)
-	body := (*bufPtr)[:0]
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		*bufPtr = body
+	buf := *bufPtr
+	n, err := r.Body.Read(buf)
+	if err != nil && err != io.EOF {
 		bodyPool.Put(bufPtr)
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
+	body := buf[:n]
 
 	var req fraudRequest
 	if err := gojson.Unmarshal(body, &req); err != nil {
-		*bufPtr = body
 		bodyPool.Put(bufPtr)
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	*bufPtr = body
 	bodyPool.Put(bufPtr)
 
 	requestedAt, err := time.Parse(time.RFC3339, req.Transaction.RequestedAt)

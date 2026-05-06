@@ -9,7 +9,7 @@ import (
 const (
 	defaultM              = 6
 	defaultEfConstruction = 200
-	defaultEfSearch       = 100
+	defaultEfSearch       = 5
 )
 
 type Index struct {
@@ -44,6 +44,18 @@ func (idx *Index) Search(query [14]float32, k int) float32 {
 func (idx *Index) SearchCount(query [14]float32, k int) int {
 	var buf [5]uint32
 	n := idx.g.searchInto(query[:], defaultEfSearch, buf[:k])
+	fraudCount := 0
+	for i := 0; i < n; i++ {
+		if idx.g.labels[buf[i]] == 1 {
+			fraudCount++
+		}
+	}
+	return fraudCount
+}
+
+func (idx *Index) SearchWithEf(query [14]float32, k, ef int) int {
+	var buf [5]uint32
+	n := idx.g.searchInto(query[:], ef, buf[:k])
 	fraudCount := 0
 	for i := 0; i < n; i++ {
 		if idx.g.labels[buf[i]] == 1 {
