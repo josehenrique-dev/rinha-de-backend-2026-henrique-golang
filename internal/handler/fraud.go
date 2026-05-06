@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"io"
+	"bytes"
 	"net/http"
 	"sync"
 	"time"
@@ -63,11 +63,8 @@ func init() {
 	}
 }
 
-var bodyPool = sync.Pool{
-	New: func() any {
-		b := make([]byte, 2048)
-		return &b
-	},
+var bufPool = sync.Pool{
+	New: func() any { return bytes.NewBuffer(make([]byte, 0, 4096)) },
 }
 
 func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {
@@ -75,23 +72,17 @@ func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) FraudScore(w http.ResponseWriter, r *http.Request) {
-	bufPtr := bodyPool.Get().(*[]byte)
-	buf := *bufPtr
-	n, err := r.Body.Read(buf)
-	if err != nil && err != io.EOF {
-		bodyPool.Put(bufPtr)
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-	body := buf[:n]
+	buf := bufPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	buf.ReadFrom(r.Body)
 
 	var req fraudRequest
-	if err := gojson.Unmarshal(body, &req); err != nil {
-		bodyPool.Put(bufPtr)
+	if err := gojson.Unmarshal(buf.Bytes(), &req); err != nil {
+		bufPool.Put(buf)
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	bodyPool.Put(bufPtr)
+	bufPool.Put(buf)
 
 	requestedAt, err := time.Parse(time.RFC3339, req.Transaction.RequestedAt)
 	if err != nil {

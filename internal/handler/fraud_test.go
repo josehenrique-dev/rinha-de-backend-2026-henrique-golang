@@ -2,6 +2,7 @@ package handler_test
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -76,6 +77,73 @@ func TestFraudScore(t *testing.T) {
 	}
 	if resp.FraudScore < 0 || resp.FraudScore > 1 {
 		t.Errorf("fraud_score out of range: %f", resp.FraudScore)
+	}
+}
+
+func TestFraudScore_LargeBody(t *testing.T) {
+	h := buildHandler(t)
+
+	merchants := make([]string, 100)
+	for i := range merchants {
+		merchants[i] = "MERCHANT-KNOWN-STORE-NUMBER-" + fmt.Sprintf("%04d", i)
+	}
+
+	type txBody struct {
+		ID          string `json:"id"`
+		Transaction struct {
+			Amount       float32 `json:"amount"`
+			Installments int     `json:"installments"`
+			RequestedAt  string  `json:"requested_at"`
+		} `json:"transaction"`
+		Customer struct {
+			AvgAmount      float32  `json:"avg_amount"`
+			TxCount24h     int      `json:"tx_count_24h"`
+			KnownMerchants []string `json:"known_merchants"`
+		} `json:"customer"`
+		Merchant struct {
+			ID        string  `json:"id"`
+			MCC       string  `json:"mcc"`
+			AvgAmount float32 `json:"avg_amount"`
+		} `json:"merchant"`
+		Terminal struct {
+			IsOnline    bool    `json:"is_online"`
+			CardPresent bool    `json:"card_present"`
+			KmFromHome  float32 `json:"km_from_home"`
+		} `json:"terminal"`
+		LastTransaction interface{} `json:"last_transaction"`
+	}
+
+	var payload txBody
+	payload.ID = "tx-large"
+	payload.Transaction.Amount = 100
+	payload.Transaction.Installments = 1
+	payload.Transaction.RequestedAt = "2026-03-11T18:45:53Z"
+	payload.Customer.AvgAmount = 100
+	payload.Customer.TxCount24h = 1
+	payload.Customer.KnownMerchants = merchants
+	payload.Merchant.ID = "MERC-AA"
+	payload.Merchant.MCC = "5411"
+	payload.Merchant.AvgAmount = 100
+	payload.Terminal.IsOnline = false
+	payload.Terminal.CardPresent = true
+	payload.Terminal.KmFromHome = 5.0
+	payload.LastTransaction = nil
+
+	bodyBytes, err := gojson.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if len(bodyBytes) <= 2048 {
+		t.Fatalf("test body must exceed 2048 bytes, got %d", len(bodyBytes))
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/fraud-score", bytes.NewReader(bodyBytes))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.FraudScore(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
