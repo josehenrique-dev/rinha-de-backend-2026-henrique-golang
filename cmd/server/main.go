@@ -8,37 +8,25 @@ import (
 	"os"
 
 	"github.com/josehenrique-dev/rinha-2026/internal/handler"
-	"github.com/josehenrique-dev/rinha-2026/internal/loader"
+	"github.com/josehenrique-dev/rinha-2026/internal/ivf"
 	"github.com/josehenrique-dev/rinha-2026/internal/service"
-	"github.com/josehenrique-dev/rinha-2026/internal/vectordb"
 	"github.com/josehenrique-dev/rinha-2026/internal/vectorize"
 )
 
-const dim = 14
-
 func main() {
-	vectorsPath := env("VECTORS_PATH", "/data/vectors.bin")
-	labelsPath := env("LABELS_PATH", "/data/labels.bin")
-	indexPath := env("INDEX_PATH", "/data/index.bin")
+	indexPath := env("INDEX_PATH", "/data/ivf.bin")
 	mccRiskPath := env("MCC_RISK_PATH", "/data/mcc_risk.json")
 	normPath := env("NORMALIZATION_PATH", "/data/normalization.json")
 	socketPath := env("SOCKET_PATH", "")
 	port := env("PORT", "8080")
 
-	ds, err := loader.Load(vectorsPath, labelsPath, dim)
+	log.Printf("loading ivf index from %s...", indexPath)
+	idx, err := ivf.Load(indexPath)
 	if err != nil {
-		log.Fatalf("load dataset: %v", err)
+		log.Fatalf("load ivf index: %v", err)
 	}
-	defer ds.Close()
-
-	log.Printf("dataset loaded: %d vectors", ds.Count)
-
-	idx, err := vectordb.Load(indexPath, ds)
-	if err != nil {
-		log.Fatalf("load hnsw index: %v", err)
-	}
-
-	log.Println("hnsw index ready")
+	defer idx.Close()
+	log.Println("ivf index ready")
 
 	mccRisk, err := loadMccRisk(mccRiskPath)
 	if err != nil {

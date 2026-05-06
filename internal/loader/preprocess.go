@@ -119,3 +119,34 @@ func BinaryExists(vectorsPath, labelsPath string) bool {
 	_, le := os.Stat(labelsPath)
 	return ve == nil && le == nil
 }
+
+// ReadAll decodes the gzipped JSON and returns all vectors (flat float32) and labels.
+func ReadAll(srcGzPath string) (vectors []float32, labels []uint8, err error) {
+	f, err := os.Open(srcGzPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("open gz: %w", err)
+	}
+	defer f.Close()
+
+	gr, err := gzip.NewReader(f)
+	if err != nil {
+		return nil, nil, fmt.Errorf("gzip reader: %w", err)
+	}
+	defer gr.Close()
+
+	var entries []refEntry
+	if err := json.NewDecoder(gr).Decode(&entries); err != nil {
+		return nil, nil, fmt.Errorf("decode json: %w", err)
+	}
+
+	n := len(entries)
+	vectors = make([]float32, n*14)
+	labels = make([]uint8, n)
+	for i, e := range entries {
+		copy(vectors[i*14:], e.Vector)
+		if e.Label == "fraud" {
+			labels[i] = 1
+		}
+	}
+	return vectors, labels, nil
+}
