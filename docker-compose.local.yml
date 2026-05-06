@@ -19,7 +19,7 @@ services:
           memory: "20MB"
 
   api1:
-    image: rinha-2026:latest
+    image: jotahenrique/fraud-detection:v1.5.4
     environment:
       - PORT=8080
       - GOMAXPROCS=1
@@ -40,7 +40,7 @@ services:
           memory: "165MB"
 
   api2:
-    image: rinha-2026:latest
+    image: jotahenrique/fraud-detection:v1.5.4
     environment:
       - PORT=8080
       - GOMAXPROCS=1
