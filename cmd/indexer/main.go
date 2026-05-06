@@ -16,7 +16,7 @@ func main() {
 	vectorsPath := env("VECTORS_PATH", "/data/vectors.bin")
 	labelsPath := env("LABELS_PATH", "/data/labels.bin")
 	indexPath := env("INDEX_PATH", "/data/index.bin")
-	maxVectors := envInt("MAX_VECTORS", 1000000)
+	maxVectors := envInt("MAX_VECTORS", 1500000)
 
 	if !loader.BinaryExists(vectorsPath, labelsPath) {
 		log.Printf("preprocessing dataset (max %d vectors)...", maxVectors)
