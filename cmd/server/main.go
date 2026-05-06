@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/josehenrique-dev/rinha-2026/internal/handler"
+"github.com/josehenrique-dev/rinha-2026/internal/handler"
 	"github.com/josehenrique-dev/rinha-2026/internal/loader"
 	"github.com/josehenrique-dev/rinha-2026/internal/service"
 	"github.com/josehenrique-dev/rinha-2026/internal/vectordb"
@@ -17,19 +17,12 @@ import (
 const dim = 14
 
 func main() {
-	vectorsPath := env("VECTORS_PATH", "/shared/vectors.bin")
-	labelsPath := env("LABELS_PATH", "/shared/labels.bin")
-	srcGz := env("SRC_GZ_PATH", "/shared/references.json.gz")
-	mccRiskPath := env("MCC_RISK_PATH", "/shared/mcc_risk.json")
-	normPath := env("NORMALIZATION_PATH", "/shared/normalization.json")
+	vectorsPath := env("VECTORS_PATH", "/data/vectors.bin")
+	labelsPath := env("LABELS_PATH", "/data/labels.bin")
+	indexPath := env("INDEX_PATH", "/data/index.bin")
+	mccRiskPath := env("MCC_RISK_PATH", "/data/mcc_risk.json")
+	normPath := env("NORMALIZATION_PATH", "/data/normalization.json")
 	port := env("PORT", "8080")
-
-	if !loader.BinaryExists(vectorsPath, labelsPath) {
-		log.Println("preprocessing dataset...")
-		if err := loader.Preprocess(srcGz, vectorsPath, labelsPath); err != nil {
-			log.Fatalf("preprocess: %v", err)
-		}
-	}
 
 	ds, err := loader.Load(vectorsPath, labelsPath, dim)
 	if err != nil {
@@ -39,9 +32,9 @@ func main() {
 
 	log.Printf("dataset loaded: %d vectors", ds.Count)
 
-	idx, err := vectordb.Build(ds)
+	idx, err := vectordb.Load(indexPath, ds)
 	if err != nil {
-		log.Fatalf("build hnsw: %v", err)
+		log.Fatalf("load hnsw index: %v", err)
 	}
 
 	log.Println("hnsw index ready")
