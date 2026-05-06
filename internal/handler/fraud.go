@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	gojson "github.com/goccy/go-json"
@@ -50,16 +52,48 @@ type fraudResponse struct {
 	FraudScore float32 `json:"fraud_score"`
 }
 
+// precomputed holds the 6 possible JSON responses (fraudCount 0..5 out of k=5).
+var precomputed [6][]byte
+
+func init() {
+	for i := 0; i <= 5; i++ {
+		score := float32(i) / 5.0
+		b, _ := gojson.Marshal(fraudResponse{Approved: score < 0.6, FraudScore: score})
+		precomputed[i] = append(b, '\n')
+	}
+}
+
+var bodyPool = sync.Pool{
+	New: func() any {
+		b := make([]byte, 0, 1024)
+		return &b
+	},
+}
+
 func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
 func (h *Handler) FraudScore(w http.ResponseWriter, r *http.Request) {
-	var req fraudRequest
-	if err := gojson.NewDecoder(r.Body).Decode(&req); err != nil {
+	bufPtr := bodyPool.Get().(*[]byte)
+	body := (*bufPtr)[:0]
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		*bufPtr = body
+		bodyPool.Put(bufPtr)
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
+
+	var req fraudRequest
+	if err := gojson.Unmarshal(body, &req); err != nil {
+		*bufPtr = body
+		bodyPool.Put(bufPtr)
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	*bufPtr = body
+	bodyPool.Put(bufPtr)
 
 	requestedAt, err := time.Parse(time.RFC3339, req.Transaction.RequestedAt)
 	if err != nil {
@@ -101,8 +135,8 @@ func (h *Handler) FraudScore(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	approved, score := h.svc.Score(p)
+	fraudCount := h.svc.FraudCount(p)
 
 	w.Header().Set("Content-Type", "application/json")
-	gojson.NewEncoder(w).Encode(fraudResponse{Approved: approved, FraudScore: score})
+	w.Write(precomputed[fraudCount])
 }

@@ -1,29 +1,30 @@
 package vectordb
 
 type visitedTracker struct {
-	visited []bool
+	bits    []uint64
 	touched []uint32
 }
 
 func newVisitedTracker(size int) *visitedTracker {
+	words := (size + 63) / 64
 	return &visitedTracker{
-		visited: make([]bool, size),
-		touched: make([]uint32, 0, 64),
+		bits:    make([]uint64, words),
+		touched: make([]uint32, 0, 256),
 	}
 }
 
 func (v *visitedTracker) isVisited(id uint32) bool {
-	return v.visited[id]
+	return v.bits[id>>6]&(1<<(id&63)) != 0
 }
 
 func (v *visitedTracker) visit(id uint32) {
-	v.visited[id] = true
+	v.bits[id>>6] |= 1 << (id & 63)
 	v.touched = append(v.touched, id)
 }
 
 func (v *visitedTracker) reset() {
 	for _, id := range v.touched {
-		v.visited[id] = false
+		v.bits[id>>6] &^= 1 << (id & 63)
 	}
 	v.touched = v.touched[:0]
 }

@@ -38,14 +38,19 @@ func Load(path string, ds *loader.Dataset) (*Index, error) {
 }
 
 func (idx *Index) Search(query [14]float32, k int) float32 {
-	results := idx.g.search(query[:], k, defaultEfSearch)
+	return float32(idx.SearchCount(query, k)) / float32(k)
+}
+
+func (idx *Index) SearchCount(query [14]float32, k int) int {
+	var buf [5]uint32
+	n := idx.g.searchInto(query[:], defaultEfSearch, buf[:k])
 	fraudCount := 0
-	for _, id := range results {
-		if idx.g.labels[id] == 1 {
+	for i := 0; i < n; i++ {
+		if idx.g.labels[buf[i]] == 1 {
 			fraudCount++
 		}
 	}
-	return float32(fraudCount) / float32(k)
+	return fraudCount
 }
 
 func (idx *Index) Close() {
