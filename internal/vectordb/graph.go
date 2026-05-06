@@ -61,7 +61,7 @@ func buildGraph(vectors []float32, labels []uint8, nodeCount, dim, M, efConstruc
 		New: func() any { return newResultHeap(efSearch) },
 	}
 
-	for i := 0; i < nodeCount; i++ {
+	for i := range nodeCount {
 		g.insertNode(uint32(i), ml, efConstruction)
 	}
 	return g
@@ -404,7 +404,7 @@ func (g *graph) searchInto(query []float32, efSearch int, out []uint32) int {
 		res.popMax()
 	}
 	n := len(res.items)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		out[i] = res.items[i].id
 	}
 
