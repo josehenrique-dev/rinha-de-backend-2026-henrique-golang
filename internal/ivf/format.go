@@ -69,6 +69,10 @@ func Load(path string) (*Index, error) {
 		return nil, fmt.Errorf("mmap: %w", err)
 	}
 
+	for i := 0; i < len(mem); i += 4096 {
+		_ = mem[i]
+	}
+
 	var mag [4]byte
 	copy(mag[:], mem[0:4])
 	if mag != magic {
