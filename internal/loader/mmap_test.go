@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/henriquefernandes/rinha-2026/internal/loader"
+	"github.com/josehenrique-dev/rinha-2026/internal/loader"
 )
 
 func TestLoadAndClose(t *testing.T) {

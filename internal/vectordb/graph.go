@@ -58,7 +58,7 @@ func buildGraph(vectors []float32, labels []uint8, nodeCount, dim, M, efConstruc
 		New: func() any { return newCandidateHeap(efSearch * 2) },
 	}
 	g.resPool = sync.Pool{
-		New: func() any { return newResultHeap(5) },
+		New: func() any { return newResultHeap(efSearch) },
 	}
 
 	for i := 0; i < nodeCount; i++ {
@@ -313,13 +313,8 @@ func (g *graph) search(query []float32, k, efSearch int) []uint32 {
 	vt := g.pool.Get().(*visitedTracker)
 	defer func() { vt.reset(); g.pool.Put(vt) }()
 
-	cands := g.candPool.Get().(*candidateHeap)
-	cands.reset()
-	defer g.candPool.Put(cands)
-
-	res := g.resPool.Get().(*resultHeap)
-	res.reset()
-	defer g.resPool.Put(res)
+	cands := newCandidateHeap(efSearch * 2)
+	res := newResultHeap(efSearch)
 
 	d := squaredDist(query, g.vec(ep))
 	cands.push(ep, d)
@@ -345,6 +340,11 @@ func (g *graph) search(query []float32, k, efSearch int) []uint32 {
 				res.push(n, nd)
 			}
 		}
+	}
+
+	// Truncate to k closest.
+	for len(res.items) > k {
+		res.popMax()
 	}
 	return res.ids()
 }
@@ -358,13 +358,18 @@ func (g *graph) searchInto(query []float32, efSearch int, out []uint32) int {
 	vt := g.pool.Get().(*visitedTracker)
 	defer func() { vt.reset(); g.pool.Put(vt) }()
 
-	cands := g.candPool.Get().(*candidateHeap)
-	cands.reset()
-	defer g.candPool.Put(cands)
-
-	res := g.resPool.Get().(*resultHeap)
-	res.reset()
-	defer g.resPool.Put(res)
+	var cands *candidateHeap
+	var res *resultHeap
+	pooled := efSearch == defaultEfSearch
+	if pooled {
+		cands = g.candPool.Get().(*candidateHeap)
+		cands.reset()
+		res = g.resPool.Get().(*resultHeap)
+		res.reset()
+	} else {
+		cands = newCandidateHeap(efSearch * 2)
+		res = newResultHeap(efSearch)
+	}
 
 	d := squaredDist(query, g.vec(ep))
 	cands.push(ep, d)
@@ -392,12 +397,20 @@ func (g *graph) searchInto(query []float32, efSearch int, out []uint32) int {
 		}
 	}
 
-	n := len(res.items)
-	if n > len(out) {
-		n = len(out)
+	// res is a max-heap of up to efSearch items; extract the k closest.
+	// Partial-sort: pop the largest until only k remain, then copy.
+	k := len(out)
+	for len(res.items) > k {
+		res.popMax()
 	}
+	n := len(res.items)
 	for i := 0; i < n; i++ {
 		out[i] = res.items[i].id
+	}
+
+	if pooled {
+		g.candPool.Put(cands)
+		g.resPool.Put(res)
 	}
 	return n
 }
