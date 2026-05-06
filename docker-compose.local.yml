@@ -5,6 +5,7 @@ services:
       - "9999:9999"
     volumes:
       - ./nginx.local.conf:/etc/nginx/nginx.conf:ro
+      - sockets:/sockets
     depends_on:
       api1:
         condition: service_healthy
@@ -21,14 +22,16 @@ services:
   api1:
     image: jotahenrique/fraud-detection:v1.5.5
     environment:
-      - PORT=8080
+      - SOCKET_PATH=/sockets/api1.sock
       - GOMAXPROCS=1
       - GOGC=off
       - GOMEMLIMIT=150MiB
+    volumes:
+      - sockets:/sockets
     networks:
       - rinha
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ready || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- --unix-socket /sockets/api1.sock http://localhost/ready 2>/dev/null || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -42,14 +45,16 @@ services:
   api2:
     image: jotahenrique/fraud-detection:v1.5.5
     environment:
-      - PORT=8080
+      - SOCKET_PATH=/sockets/api2.sock
       - GOMAXPROCS=1
       - GOGC=off
       - GOMEMLIMIT=150MiB
+    volumes:
+      - sockets:/sockets
     networks:
       - rinha
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ready || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- --unix-socket /sockets/api2.sock http://localhost/ready 2>/dev/null || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -59,6 +64,14 @@ services:
         limits:
           cpus: "0.45"
           memory: "165MB"
+
+volumes:
+  sockets:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=4m"
 
 networks:
   rinha:
