@@ -69,7 +69,7 @@ func (h *resultHeap) push(id uint32, dist float32) {
 	}
 }
 func (h *resultHeap) worst() float32 {
-	if len(h.items) == 0 {
+	if len(h.items) < h.cap {
 		return 1e38
 	}
 	return h.items[0].dist
