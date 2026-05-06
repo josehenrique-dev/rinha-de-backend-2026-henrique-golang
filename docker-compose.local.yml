@@ -1,6 +1,7 @@
 services:
   nginx:
     image: nginx:alpine
+    cpuset: "0,2"
     ports:
       - "9999:9999"
     volumes:
@@ -21,6 +22,7 @@ services:
 
   api1:
     image: jotahenrique/fraud-detection:v1.5.5
+    cpuset: "0-1"
     environment:
       - SOCKET_PATH=/sockets/api1.sock
       - GOMAXPROCS=1
@@ -44,6 +46,7 @@ services:
 
   api2:
     image: jotahenrique/fraud-detection:v1.5.5
+    cpuset: "2-3"
     environment:
       - SOCKET_PATH=/sockets/api2.sock
       - GOMAXPROCS=1
