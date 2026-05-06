@@ -2,8 +2,8 @@ resources/references.json.gz
 resources/vectors.bin
 resources/labels.bin
 resources/index.bin
-indexer
-server
+/indexer
+/server
 .idea/
 cmd/bench/
 docs/
