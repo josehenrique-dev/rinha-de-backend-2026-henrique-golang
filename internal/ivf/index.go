@@ -9,7 +9,7 @@ import (
 
 const (
 	Dim       = 14
-	NClusters = 512
+	NClusters = 1024
 	scaleF    = float32(32767)
 )
 
@@ -154,22 +154,46 @@ func (idx *Index) scan(qi [Dim]int16, k int, clusters []int) int {
 }
 
 func distArrayCent(q [Dim]float32, c *[Dim]float32) float32 {
-	var s float32
-	for i := 0; i < Dim; i++ {
-		d := q[i] - c[i]
-		s += d * d
-	}
-	return s
+	d0 := q[0] - c[0]
+	d1 := q[1] - c[1]
+	d2 := q[2] - c[2]
+	d3 := q[3] - c[3]
+	d4 := q[4] - c[4]
+	d5 := q[5] - c[5]
+	d6 := q[6] - c[6]
+	d7 := q[7] - c[7]
+	d8 := q[8] - c[8]
+	d9 := q[9] - c[9]
+	d10 := q[10] - c[10]
+	d11 := q[11] - c[11]
+	d12 := q[12] - c[12]
+	d13 := q[13] - c[13]
+	return d0*d0 + d1*d1 + d2*d2 + d3*d3 +
+		d4*d4 + d5*d5 + d6*d6 + d7*d7 +
+		d8*d8 + d9*d9 + d10*d10 + d11*d11 +
+		d12*d12 + d13*d13
 }
 
 func distInt16(q [Dim]int16, v []int16) int32 {
-	_ = v[Dim-1]
-	var s int32
-	for i := 0; i < Dim; i++ {
-		d := int32(q[i]) - int32(v[i])
-		s += d * d
-	}
-	return s
+	_ = v[13]
+	d0 := int32(q[0]) - int32(v[0])
+	d1 := int32(q[1]) - int32(v[1])
+	d2 := int32(q[2]) - int32(v[2])
+	d3 := int32(q[3]) - int32(v[3])
+	d4 := int32(q[4]) - int32(v[4])
+	d5 := int32(q[5]) - int32(v[5])
+	d6 := int32(q[6]) - int32(v[6])
+	d7 := int32(q[7]) - int32(v[7])
+	d8 := int32(q[8]) - int32(v[8])
+	d9 := int32(q[9]) - int32(v[9])
+	d10 := int32(q[10]) - int32(v[10])
+	d11 := int32(q[11]) - int32(v[11])
+	d12 := int32(q[12]) - int32(v[12])
+	d13 := int32(q[13]) - int32(v[13])
+	return d0*d0 + d1*d1 + d2*d2 + d3*d3 +
+		d4*d4 + d5*d5 + d6*d6 + d7*d7 +
+		d8*d8 + d9*d9 + d10*d10 + d11*d11 +
+		d12*d12 + d13*d13
 }
 
 func Build(vectors []float32, labels []uint8, nVectors int) (*Index, error) {
