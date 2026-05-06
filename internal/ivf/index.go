@@ -8,7 +8,7 @@ import (
 
 const (
 	Dim       = 14
-	NClusters = 2048
+	NClusters = 4096
 	scaleF    = float32(32767)
 )
 
@@ -40,22 +40,22 @@ func (idx *Index) SearchCount(query [Dim]float32, k int) int {
 		qi[i] = int16(v)
 	}
 
-	var topC [50]int
+	var topC [40]int
 	idx.topCentroids(query, &topC)
 
-	fc := idx.scan(qi, k, topC[:10])
+	fc := idx.scan(qi, k, topC[:15])
 	if fc >= 1 && fc <= 4 {
-		fc = idx.scan(qi, k, topC[:50])
+		fc = idx.scan(qi, k, topC[:40])
 	}
 	return fc
 }
 
-func (idx *Index) topCentroids(query [Dim]float32, out *[50]int) {
+func (idx *Index) topCentroids(query [Dim]float32, out *[40]int) {
 	type entry struct {
 		d float32
 		c int
 	}
-	var best [50]entry
+	var best [40]entry
 	n := len(out)
 	filled := 0
 	worstD := float32(1e38)
