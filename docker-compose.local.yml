@@ -33,7 +33,7 @@ services:
     networks:
       - rinha
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- --unix-socket /sockets/api1.sock http://localhost/ready 2>/dev/null || exit 1"]
+      test: ["CMD-SHELL", "test -S /sockets/api1.sock"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -57,7 +57,7 @@ services:
     networks:
       - rinha
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- --unix-socket /sockets/api2.sock http://localhost/ready 2>/dev/null || exit 1"]
+      test: ["CMD-SHELL", "test -S /sockets/api2.sock"]
       interval: 5s
       timeout: 3s
       retries: 10
