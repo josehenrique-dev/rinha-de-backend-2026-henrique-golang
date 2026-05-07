@@ -106,3 +106,39 @@ func sortClusterByCentroidDist(vectors []int16, ids []uint32, centroid []int16) 
 	}
 	return out
 }
+
+func buildIVFBlocks(vectors []int16, listOffsets, blockOffsets []uint32) []int16 {
+	blockCount := int(blockOffsets[len(blockOffsets)-1])
+	blocks := make([]int16, blockCount*blockStride)
+	for c := 0; c+1 < len(listOffsets); c++ {
+		rowStart := int(listOffsets[c])
+		rowEnd := int(listOffsets[c+1])
+		blockStart := int(blockOffsets[c])
+		for row := rowStart; row < rowEnd; row++ {
+			rel := row - rowStart
+			block := blockStart + rel/blockSize
+			lane := rel % blockSize
+			blockBase := block * blockStride
+			vectorBase := row * Dim
+			for d := range Dim {
+				blocks[blockBase+d*blockSize+lane] = vectors[vectorBase+d]
+			}
+		}
+	}
+	return blocks
+}
+
+func buildCentroidBlocks(centroids []int16, clusters int) []int16 {
+	blockCount := blocksForRows(clusters)
+	blocks := make([]int16, blockCount*blockStride)
+	for c := range clusters {
+		block := c / blockSize
+		lane := c % blockSize
+		blockBase := block * blockStride
+		centBase := c * Dim
+		for d := range Dim {
+			blocks[blockBase+d*blockSize+lane] = centroids[centBase+d]
+		}
+	}
+	return blocks
+}
