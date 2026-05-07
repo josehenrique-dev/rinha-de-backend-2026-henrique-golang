@@ -21,7 +21,7 @@ services:
           memory: "20MB"
 
   api1:
-    image: jotahenrique/fraud-detection:v1.5.7
+    image: jotahenrique/fraud-detection:v1.5.8
     cpuset: "0-1"
     environment:
       - SOCKET_PATH=/sockets/api1.sock
@@ -45,7 +45,7 @@ services:
           memory: "165MB"
 
   api2:
-    image: jotahenrique/fraud-detection:v1.5.7
+    image: jotahenrique/fraud-detection:v1.5.8
     cpuset: "2-3"
     environment:
       - SOCKET_PATH=/sockets/api2.sock
