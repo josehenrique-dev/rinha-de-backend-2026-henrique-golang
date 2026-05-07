@@ -142,3 +142,92 @@ func buildCentroidBlocks(centroids []int16, clusters int) []int16 {
 	}
 	return blocks
 }
+
+func Build(vectors []float32, labels []uint8, nVectors int) (*Index, error) {
+	if nVectors == 0 {
+		return nil, errNoVectors
+	}
+
+	clusters := NClusters
+	if clusters > nVectors {
+		clusters = highestPowerOfTwoLE(nVectors)
+	}
+
+	qvecs := make([]int16, nVectors*Dim)
+	for i := range nVectors {
+		src := vectors[i*Dim : (i+1)*Dim]
+		var v [Dim]float32
+		copy(v[:], src)
+		q := quantizeVector(v)
+		copy(qvecs[i*Dim:(i+1)*Dim], q[:])
+	}
+
+	ids := make([]uint32, nVectors)
+	for i := range nVectors {
+		ids[i] = uint32(i)
+	}
+
+	ranges := make([]ivfBuildRange, clusters)
+	balancedSplit(qvecs, ids, ranges, 0, nVectors, 0, clusters)
+
+	return materializeIVF(qvecs, labels, ids, ranges, clusters), nil
+}
+
+func materializeIVF(vectors []int16, labels []uint8, ids []uint32, ranges []ivfBuildRange, clusters int) *Index {
+	orderedVecs := make([]int16, len(vectors))
+	orderedLabs := make([]uint8, len(labels))
+	centroids := make([]int16, clusters*Dim)
+	listOffsets := make([]uint32, clusters+1)
+	blockOffsets := make([]uint32, clusters+1)
+	bboxMin := make([]int16, clusters*Dim)
+	bboxMax := make([]int16, clusters*Dim)
+	origIDs := make([]uint32, len(labels))
+
+	pos, blockPos := 0, 0
+	for c, r := range ranges {
+		listOffsets[c] = uint32(pos)
+		blockOffsets[c] = uint32(blockPos)
+		computeClusterStats(vectors, ids, r,
+			centroids[c*Dim:(c+1)*Dim], bboxMin[c*Dim:(c+1)*Dim], bboxMax[c*Dim:(c+1)*Dim])
+
+		clusterIDs := sortClusterByCentroidDist(vectors, ids[r.start:r.end], centroids[c*Dim:(c+1)*Dim])
+		for _, origID := range clusterIDs {
+			copy(orderedVecs[pos*Dim:(pos+1)*Dim], vectors[int(origID)*Dim:(int(origID)+1)*Dim])
+			orderedLabs[pos] = labels[origID]
+			origIDs[pos] = origID
+			pos++
+		}
+		listOffsets[c+1] = uint32(pos)
+		blockPos += blocksForRows(len(clusterIDs))
+		blockOffsets[c+1] = uint32(blockPos)
+	}
+
+	blocks := buildIVFBlocks(orderedVecs, listOffsets, blockOffsets)
+	centroidBlocks := buildCentroidBlocks(centroids, clusters)
+
+	return &Index{
+		blocks: blocks,
+		labels: orderedLabs,
+		ivf: ivfMeta{
+			clusters:        clusters,
+			nprobe:          8,
+			ambiguousNprobe: 24,
+			repair:          true,
+			centroids:       centroids,
+			centroidBlocks:  centroidBlocks,
+			listOffsets:     listOffsets,
+			blockOffsets:    blockOffsets,
+			bboxMin:         bboxMin,
+			bboxMax:         bboxMax,
+			origIDs:         origIDs,
+		},
+	}
+}
+
+func highestPowerOfTwoLE(v int) int {
+	p := 1
+	for p*2 <= v {
+		p *= 2
+	}
+	return p
+}
