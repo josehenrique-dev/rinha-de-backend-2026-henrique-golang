@@ -5,5 +5,4 @@ resources/index.bin
 /indexer
 /server
 .idea/
-cmd/bench/
-docs/
+vendor/
