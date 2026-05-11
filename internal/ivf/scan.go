@@ -58,6 +58,11 @@ func (s *ivfSearchState) insert(d int64, fraud bool, origID uint32) {
 }
 
 func (idx *Index) scanCluster(query [Dim]int16, cluster int, state *ivfSearchState) {
+	if len(idx.ivf.bboxMin) >= (cluster+1)*Dim {
+		if idx.bboxDist(query, cluster, state.bestDist[4]) > state.bestDist[4] {
+			return
+		}
+	}
 	if useIVFAVX2 {
 		idx.scanBlocksAVX2(query, cluster, state)
 	} else {

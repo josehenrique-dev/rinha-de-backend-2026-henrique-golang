@@ -2,7 +2,6 @@ package vectorize_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/josehenrique-dev/rinha-2026/internal/vectorize"
 )
@@ -19,13 +18,12 @@ func TestVectorizeKnownLegit(t *testing.T) {
 	}
 	mccRisk := map[string]float32{"5411": 0.15}
 
-	requestedAt, _ := time.Parse(time.RFC3339, "2026-03-11T18:45:53Z")
 	p := vectorize.Payload{
 		ID: "tx-1329056812",
 		Transaction: vectorize.Transaction{
 			Amount:       41.12,
 			Installments: 2,
-			RequestedAt:  requestedAt,
+			RequestedAt:  "2026-03-11T18:45:53Z",
 		},
 		Customer: vectorize.Customer{
 			AvgAmount:      82.24,
@@ -76,13 +74,12 @@ func TestVectorizeKnownFraud(t *testing.T) {
 	}
 	mccRisk := map[string]float32{"7802": 0.75}
 
-	requestedAt, _ := time.Parse(time.RFC3339, "2026-03-14T05:15:12Z")
 	p := vectorize.Payload{
 		ID: "tx-3330991687",
 		Transaction: vectorize.Transaction{
 			Amount:       9505.97,
 			Installments: 10,
-			RequestedAt:  requestedAt,
+			RequestedAt:  "2026-03-14T05:15:12Z",
 		},
 		Customer: vectorize.Customer{
 			AvgAmount:      81.28,
