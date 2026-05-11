@@ -3,7 +3,6 @@ package vectorize
 import (
 	"fmt"
 	"slices"
-	"time"
 )
 
 type Normalization struct {
@@ -19,7 +18,7 @@ type Normalization struct {
 type Transaction struct {
 	Amount       float32
 	Installments int
-	RequestedAt  time.Time
+	RequestedAt  string
 }
 
 type Customer struct {
@@ -41,7 +40,7 @@ type Terminal struct {
 }
 
 type LastTransaction struct {
-	Timestamp     time.Time
+	Timestamp     string
 	KmFromCurrent float32
 }
 
@@ -88,6 +87,42 @@ func isKnownMerchant(id string, known []string) bool {
 	return slices.Contains(known, id)
 }
 
+func parseMinutesBetween(later, earlier string) float32 {
+	if len(later) < 19 || len(earlier) < 19 {
+		return 0
+	}
+	ly := int(later[0]-'0')*1000 + int(later[1]-'0')*100 + int(later[2]-'0')*10 + int(later[3]-'0')
+	lm := int(later[5]-'0')*10 + int(later[6]-'0')
+	ld := int(later[8]-'0')*10 + int(later[9]-'0')
+	lh := int(later[11]-'0')*10 + int(later[12]-'0')
+	lmin := int(later[14]-'0')*10 + int(later[15]-'0')
+	ls := int(later[17]-'0')*10 + int(later[18]-'0')
+
+	ey := int(earlier[0]-'0')*1000 + int(earlier[1]-'0')*100 + int(earlier[2]-'0')*10 + int(earlier[3]-'0')
+	em := int(earlier[5]-'0')*10 + int(earlier[6]-'0')
+	ed := int(earlier[8]-'0')*10 + int(earlier[9]-'0')
+	eh := int(earlier[11]-'0')*10 + int(earlier[12]-'0')
+	emin := int(earlier[14]-'0')*10 + int(earlier[15]-'0')
+	es := int(earlier[17]-'0')*10 + int(earlier[18]-'0')
+
+	lTotal := toUnixDays(ly, lm, ld)*1440 + lh*60 + lmin + ls/60
+	eTotal := toUnixDays(ey, em, ed)*1440 + eh*60 + emin + es/60
+
+	diff := lTotal - eTotal
+	if diff < 0 {
+		diff = 0
+	}
+	return float32(diff)
+}
+
+func toUnixDays(y, m, d int) int {
+	if m <= 2 {
+		y--
+		m += 12
+	}
+	return 365*y + y/4 - y/100 + y/400 + (153*(m-3)+2)/5 + d - 719469
+}
+
 func Vectorize(p Payload, mccRisk map[string]float32, norm Normalization) [14]float32 {
 	var v [14]float32
 
@@ -95,24 +130,16 @@ func Vectorize(p Payload, mccRisk map[string]float32, norm Normalization) [14]fl
 	v[1] = clamp(float32(p.Transaction.Installments) / norm.MaxInstallments)
 	v[2] = clamp((p.Transaction.Amount / p.Customer.AvgAmount) / norm.AmountVsAvgRatio)
 
-	hour := float32(p.Transaction.RequestedAt.UTC().Hour())
-	v[3] = hour / 23.0
-
-	wd := p.Transaction.RequestedAt.UTC().Weekday()
-	var dayIdx float32
-	if wd == time.Sunday {
-		dayIdx = 6
-	} else {
-		dayIdx = float32(wd) - 1
-	}
-	v[4] = dayIdx / 6.0
+	hour, weekday, _ := parseHourWeekday(p.Transaction.RequestedAt)
+	v[3] = float32(hour) / 23.0
+	v[4] = float32(weekday) / 6.0
 
 	if p.LastTransaction == nil {
 		v[5] = -1
 		v[6] = -1
 	} else {
-		minutes := p.Transaction.RequestedAt.Sub(p.LastTransaction.Timestamp).Minutes()
-		v[5] = clamp(float32(minutes) / norm.MaxMinutes)
+		minutes := parseMinutesBetween(p.Transaction.RequestedAt, p.LastTransaction.Timestamp)
+		v[5] = clamp(minutes / norm.MaxMinutes)
 		v[6] = clamp(p.LastTransaction.KmFromCurrent / norm.MaxKm)
 	}
 

@@ -3,12 +3,14 @@ package main
 import (
 	"encoding/json"
 	"log"
-	"net"
-	"net/http"
+	"math"
 	"os"
+	"runtime"
+	"runtime/debug"
 
 	"github.com/josehenrique-dev/rinha-2026/internal/handler"
 	"github.com/josehenrique-dev/rinha-2026/internal/ivf"
+	"github.com/josehenrique-dev/rinha-2026/internal/server"
 	"github.com/josehenrique-dev/rinha-2026/internal/service"
 	"github.com/josehenrique-dev/rinha-2026/internal/vectorize"
 )
@@ -28,6 +30,10 @@ func main() {
 	defer idx.Close()
 	log.Println("ivf index ready")
 
+	runtime.GC()
+	debug.SetGCPercent(-1)
+	debug.SetMemoryLimit(math.MaxInt64)
+
 	mccRisk, err := loadMccRisk(mccRiskPath)
 	if err != nil {
 		log.Fatalf("load mcc_risk: %v", err)
@@ -39,34 +45,34 @@ func main() {
 	}
 
 	svc := service.New(idx, mccRisk, norm)
-	h := handler.New(svc)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /ready", h.Ready)
-	mux.HandleFunc("POST /fraud-score", h.FraudScore)
+	h := func(path []byte, body []byte) []byte {
+		if len(path) >= 6 && path[1] == 'r' {
+			return server.Responses[6]
+		}
+		var p vectorize.Payload
+		if err := handler.ParsePayload(body, &p); err != nil {
+			return server.Responses[0]
+		}
+		fraudCount := svc.FraudCount(p)
+		return server.Responses[fraudCount]
+	}
 
-	var ln net.Listener
 	if socketPath != "" {
-		os.Remove(socketPath)
-		ln, err = net.Listen("unix", socketPath)
+		_, err = server.Listen(socketPath, h)
 		if err != nil {
 			log.Fatalf("listen unix %s: %v", socketPath, err)
 		}
-		if err := os.Chmod(socketPath, 0666); err != nil {
-			log.Fatalf("chmod socket: %v", err)
-		}
 		log.Printf("listening on unix:%s", socketPath)
 	} else {
-		ln, err = net.Listen("tcp", ":"+port)
+		_, err = server.ListenTCP(":"+port, h)
 		if err != nil {
 			log.Fatalf("listen tcp :%s: %v", port, err)
 		}
 		log.Printf("listening on :%s", port)
 	}
 
-	if err := http.Serve(ln, mux); err != nil {
-		log.Fatalf("server: %v", err)
-	}
+	select {}
 }
 
 func env(key, fallback string) string {
