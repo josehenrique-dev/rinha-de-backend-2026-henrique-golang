@@ -1,0 +1,79 @@
+services:
+  haproxy:
+    image: haproxy:3.0-alpine
+    ports:
+      - "9999:9999"
+    volumes:
+      - ./haproxy.local.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - sockets:/sockets
+    command: ["haproxy", "-f", "/usr/local/etc/haproxy/haproxy.cfg", "-db"]
+    depends_on:
+      api1:
+        condition: service_healthy
+      api2:
+        condition: service_healthy
+    networks:
+      - rinha
+    deploy:
+      resources:
+        limits:
+          cpus: "0.10"
+          memory: "16MB"
+
+  api1:
+    image: jotahenrique/fraud-detection:v1.9.0
+    environment:
+      - SOCKET_PATH=/sockets/api1.sock
+      - GOMAXPROCS=1
+      - GOGC=off
+      - GOMEMLIMIT=150MiB
+    volumes:
+      - sockets:/sockets
+    networks:
+      - rinha
+    healthcheck:
+      test: ["CMD-SHELL", "test -S /sockets/api1.sock"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.45"
+          memory: "165MB"
+
+  api2:
+    image: jotahenrique/fraud-detection:v1.9.0
+    environment:
+      - SOCKET_PATH=/sockets/api2.sock
+      - GOMAXPROCS=1
+      - GOGC=off
+      - GOMEMLIMIT=150MiB
+    volumes:
+      - sockets:/sockets
+    networks:
+      - rinha
+    healthcheck:
+      test: ["CMD-SHELL", "test -S /sockets/api2.sock"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.45"
+          memory: "165MB"
+
+volumes:
+  sockets:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=4m"
+
+networks:
+  rinha:
+    driver: bridge
