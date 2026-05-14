@@ -1,0 +1,7 @@
+{
+    "participants": ["Henrique"],
+    "social": ["https://github.com/josehenrique-dev"],
+    "source-code-repo": "https://github.com/josehenrique-dev/rinha-de-backend-2026-henrique-golang",
+    "stack": ["go", "ivf", "haproxy"],
+    "open_to_work": false
+}

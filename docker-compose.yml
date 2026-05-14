@@ -4,7 +4,7 @@ services:
     ports:
       - "9999:9999"
     volumes:
-      - ./haproxy.local.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
       - sockets:/sockets
     command: ["haproxy", "-f", "/usr/local/etc/haproxy/haproxy.cfg", "-db"]
     depends_on:
