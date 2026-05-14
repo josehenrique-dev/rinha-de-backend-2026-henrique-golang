@@ -1,15 +1,21 @@
-FROM golang:1.24-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
 WORKDIR /app
 COPY go.mod go.sum ./
 COPY vendor ./vendor
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v3 \
-    go build -mod=vendor -pgo=auto -ldflags="-s -w" -o /indexer ./cmd/indexer
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v3 \
     go build -mod=vendor -pgo=auto -ldflags="-s -w" -o /server ./cmd/server
 
-FROM golang:1.24-alpine AS indexer
-COPY --from=builder /indexer /indexer
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS native-builder
+WORKDIR /app
+COPY go.mod go.sum ./
+COPY vendor ./vendor
+COPY . .
+RUN CGO_ENABLED=0 \
+    go build -mod=vendor -ldflags="-s -w" -o /indexer ./cmd/indexer
+
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS indexer
+COPY --from=native-builder /indexer /indexer
 COPY resources/references.json.gz /data/references.json.gz
 COPY resources/mcc_risk.json /data/mcc_risk.json
 COPY resources/normalization.json /data/normalization.json
