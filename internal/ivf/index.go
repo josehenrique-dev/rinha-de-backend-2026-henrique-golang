@@ -7,7 +7,7 @@ import (
 
 const (
 	Dim         = 14
-	NClusters   = 8192
+	NClusters   = 4096
 	blockSize   = 8
 	blockStride = Dim * blockSize
 	maxIVFProbe = 128

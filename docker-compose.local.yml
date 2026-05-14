@@ -1,12 +1,12 @@
 services:
-  nginx:
-    image: nginx:alpine
-    cpuset: "0,2"
+  haproxy:
+    image: haproxy:3.0-alpine
     ports:
       - "9999:9999"
     volumes:
-      - ./nginx.local.conf:/etc/nginx/nginx.conf:ro
+      - ./haproxy.local.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
       - sockets:/sockets
+    command: ["haproxy", "-f", "/usr/local/etc/haproxy/haproxy.cfg", "-db"]
     depends_on:
       api1:
         condition: service_healthy
@@ -17,12 +17,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.1"
-          memory: "20MB"
+          cpus: "0.10"
+          memory: "16MB"
 
   api1:
-    image: jotahenrique/fraud-detection:v1.5.8
-    cpuset: "0-1"
+    image: jotahenrique/fraud-detection:v1.8.0
     environment:
       - SOCKET_PATH=/sockets/api1.sock
       - GOMAXPROCS=1
@@ -45,8 +44,7 @@ services:
           memory: "165MB"
 
   api2:
-    image: jotahenrique/fraud-detection:v1.5.8
-    cpuset: "2-3"
+    image: jotahenrique/fraud-detection:v1.8.0
     environment:
       - SOCKET_PATH=/sockets/api2.sock
       - GOMAXPROCS=1

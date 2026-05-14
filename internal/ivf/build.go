@@ -150,7 +150,7 @@ func Build(vectors []float32, labels []uint8, nVectors int) (*Index, error) {
 
 	clusters := NClusters
 	if clusters > nVectors {
-		clusters = highestPowerOfTwoLE(nVectors)
+		clusters = nVectors
 	}
 
 	qvecs := make([]int16, nVectors*Dim)
@@ -162,13 +162,32 @@ func Build(vectors []float32, labels []uint8, nVectors int) (*Index, error) {
 		copy(qvecs[i*Dim:(i+1)*Dim], q[:])
 	}
 
+	assign := trainKMeans(qvecs, nVectors, clusters)
+
 	ids := make([]uint32, nVectors)
 	for i := range nVectors {
 		ids[i] = uint32(i)
 	}
 
 	ranges := make([]ivfBuildRange, clusters)
-	balancedSplit(qvecs, ids, ranges, 0, nVectors, 0, clusters)
+	clusterCounts := make([]int, clusters)
+	for _, c := range assign {
+		clusterCounts[c]++
+	}
+
+	pos := 0
+	for c := range clusters {
+		ranges[c].start = pos
+		pos += clusterCounts[c]
+		ranges[c].end = pos
+	}
+
+	clusterPos := make([]int, clusters)
+	for i, c := range assign {
+		idx := ranges[c].start + clusterPos[c]
+		ids[idx] = uint32(i)
+		clusterPos[c]++
+	}
 
 	return materializeIVF(qvecs, labels, ids, ranges, clusters), nil
 }

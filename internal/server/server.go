@@ -198,3 +198,15 @@ func isContentLengthPrefix(b []byte) bool {
 	}
 	return true
 }
+
+func (s *Server) ServeFDChannel(fdCh <-chan int) {
+	for fd := range fdCh {
+		f := os.NewFile(uintptr(fd), "scm-fd")
+		conn, err := net.FileConn(f)
+		f.Close()
+		if err != nil {
+			continue
+		}
+		go s.handleConn(conn)
+	}
+}

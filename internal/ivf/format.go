@@ -108,9 +108,7 @@ func Load(path string) (*Index, error) {
 		return loadHeap(f)
 	}
 
-	for i := 0; i < len(mem); i += 4096 {
-		_ = mem[i]
-	}
+	postMmap(mem)
 
 	idx, err := parseIndexBytes(mem)
 	if err != nil {

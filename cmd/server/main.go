@@ -7,7 +7,10 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
+	"strconv"
+	"time"
 
+	"github.com/josehenrique-dev/rinha-2026/internal/fdpass"
 	"github.com/josehenrique-dev/rinha-2026/internal/handler"
 	"github.com/josehenrique-dev/rinha-2026/internal/ivf"
 	"github.com/josehenrique-dev/rinha-2026/internal/server"
@@ -16,6 +19,8 @@ import (
 )
 
 func main() {
+	runtime.GOMAXPROCS(1)
+
 	indexPath := env("INDEX_PATH", "/data/ivf.bin")
 	mccRiskPath := env("MCC_RISK_PATH", "/data/mcc_risk.json")
 	normPath := env("NORMALIZATION_PATH", "/data/normalization.json")
@@ -29,6 +34,9 @@ func main() {
 	}
 	defer idx.Close()
 	log.Println("ivf index ready")
+
+	d := ivf.Warmup(idx, 500)
+	log.Printf("warmup: 500 iters in %s", d)
 
 	runtime.GC()
 	debug.SetGCPercent(-1)
@@ -46,10 +54,22 @@ func main() {
 
 	svc := service.New(idx, mccRisk, norm)
 
+	shedSlots := envInt("SHED_SLOTS", 4)
+	shedTimeoutMS := envInt("SHED_TIMEOUT_MS", 3)
+	shedSem := make(chan struct{}, shedSlots)
+
 	h := func(path []byte, body []byte) []byte {
 		if len(path) >= 6 && path[1] == 'r' {
 			return server.Responses[6]
 		}
+
+		select {
+		case shedSem <- struct{}{}:
+			defer func() { <-shedSem }()
+		case <-time.After(time.Duration(shedTimeoutMS) * time.Millisecond):
+			return server.Responses[0]
+		}
+
 		var p vectorize.Payload
 		if err := handler.ParsePayload(body, &p); err != nil {
 			return server.Responses[0]
@@ -58,18 +78,29 @@ func main() {
 		return server.Responses[fraudCount]
 	}
 
+	var srv *server.Server
 	if socketPath != "" {
-		_, err = server.Listen(socketPath, h)
+		srv, err = server.Listen(socketPath, h)
 		if err != nil {
 			log.Fatalf("listen unix %s: %v", socketPath, err)
 		}
 		log.Printf("listening on unix:%s", socketPath)
 	} else {
-		_, err = server.ListenTCP(":"+port, h)
+		srv, err = server.ListenTCP(":"+port, h)
 		if err != nil {
 			log.Fatalf("listen tcp :%s: %v", port, err)
 		}
 		log.Printf("listening on :%s", port)
+	}
+
+	if ctrlPath := os.Getenv("API_CTRL_SOCKET"); ctrlPath != "" {
+		fdCh, _, err := fdpass.Listen(ctrlPath)
+		if err != nil {
+			log.Printf("WARN: fdpass listen on %q: %v", ctrlPath, err)
+		} else {
+			log.Printf("fdpass listening on %s", ctrlPath)
+			go srv.ServeFDChannel(fdCh)
+		}
 	}
 
 	select {}
@@ -80,6 +111,18 @@ func env(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func envInt(key string, def int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 1 {
+		return def
+	}
+	return n
 }
 
 func loadMccRisk(path string) (map[string]float32, error) {
