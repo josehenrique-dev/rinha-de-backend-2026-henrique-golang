@@ -21,7 +21,7 @@ services:
           memory: "16MB"
 
   api1:
-    image: jotahenrique/fraud-detection:v1.9.0
+    image: jotahenrique/fraud-detection:v1.10.0
     environment:
       - SOCKET_PATH=/sockets/api1.sock
       - GOMAXPROCS=1
@@ -44,7 +44,7 @@ services:
           memory: "165MB"
 
   api2:
-    image: jotahenrique/fraud-detection:v1.9.0
+    image: jotahenrique/fraud-detection:v1.10.0
     environment:
       - SOCKET_PATH=/sockets/api2.sock
       - GOMAXPROCS=1
