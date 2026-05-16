@@ -138,23 +138,16 @@ func kMeansPlusPlus(sampleVecs []float32, sampleSize, clusters int, rng *pcgRng)
 	}
 
 	dists := make([]float64, sampleSize)
+	for i := range sampleSize {
+		var dist float64
+		for d := range Dim {
+			delta := sampleVecs[i*Dim+d] - centroids[0*Dim+d]
+			dist += float64(delta * delta)
+		}
+		dists[i] = dist
+	}
 
 	for c := 1; c < clusters; c++ {
-		for i := range sampleSize {
-			bestDist := math.MaxFloat64
-			for prevC := 0; prevC < c; prevC++ {
-				var dist float64
-				for d := range Dim {
-					delta := sampleVecs[i*Dim+d] - centroids[prevC*Dim+d]
-					dist += float64(delta * delta)
-				}
-				if dist < bestDist {
-					bestDist = dist
-				}
-			}
-			dists[i] = bestDist
-		}
-
 		var totalDist float64
 		for i := range sampleSize {
 			totalDist += dists[i]
@@ -173,6 +166,17 @@ func kMeansPlusPlus(sampleVecs []float32, sampleSize, clusters int, rng *pcgRng)
 
 		for d := range Dim {
 			centroids[c*Dim+d] = sampleVecs[chosenID*Dim+d]
+		}
+
+		for i := range sampleSize {
+			var dist float64
+			for d := range Dim {
+				delta := sampleVecs[i*Dim+d] - centroids[c*Dim+d]
+				dist += float64(delta * delta)
+			}
+			if dist < dists[i] {
+				dists[i] = dist
+			}
 		}
 	}
 
