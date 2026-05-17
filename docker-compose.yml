@@ -40,8 +40,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.45"
-          memory: "165MB"
+          cpus: "0.44"
+          memory: "164MB"
 
   api2:
     image: jotahenrique/fraud-detection:v1.11.0
@@ -63,8 +63,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.45"
-          memory: "165MB"
+          cpus: "0.44"
+          memory: "164MB"
 
   warmup:
     image: curlimages/curl:8.10.1
