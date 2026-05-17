@@ -7,9 +7,6 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
-	"strconv"
-	"time"
-
 	"github.com/josehenrique-dev/rinha-2026/internal/fdpass"
 	"github.com/josehenrique-dev/rinha-2026/internal/handler"
 	"github.com/josehenrique-dev/rinha-2026/internal/ivf"
@@ -54,20 +51,9 @@ func main() {
 
 	svc := service.New(idx, mccRisk, norm)
 
-	shedSlots := envInt("SHED_SLOTS", 4)
-	shedTimeoutMS := envInt("SHED_TIMEOUT_MS", 3)
-	shedSem := make(chan struct{}, shedSlots)
-
 	h := func(path []byte, body []byte) []byte {
 		if len(path) >= 6 && path[1] == 'r' {
 			return server.Responses[6]
-		}
-
-		select {
-		case shedSem <- struct{}{}:
-			defer func() { <-shedSem }()
-		case <-time.After(time.Duration(shedTimeoutMS) * time.Millisecond):
-			return server.Responses[0]
 		}
 
 		var p vectorize.Payload
@@ -113,17 +99,6 @@ func env(key, fallback string) string {
 	return fallback
 }
 
-func envInt(key string, def int) int {
-	v := os.Getenv(key)
-	if v == "" {
-		return def
-	}
-	n, err := strconv.Atoi(v)
-	if err != nil || n < 1 {
-		return def
-	}
-	return n
-}
 
 func loadMccRisk(path string) (map[string]float32, error) {
 	f, err := os.Open(path)
