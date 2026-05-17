@@ -40,7 +40,7 @@ services:
       resources:
         limits:
           cpus: "0.44"
-          memory: "163MB"
+          memory: "162MB"
 
   api2:
     image: jotahenrique/fraud-detection:v1.11.0
@@ -63,7 +63,7 @@ services:
       resources:
         limits:
           cpus: "0.44"
-          memory: "163MB"
+          memory: "162MB"
 
   warmup:
     image: curlimages/curl:8.10.1
@@ -92,7 +92,7 @@ services:
       resources:
         limits:
           cpus: "0.02"
-          memory: "4MB"
+          memory: "6MB"
 
 volumes:
   sockets:
