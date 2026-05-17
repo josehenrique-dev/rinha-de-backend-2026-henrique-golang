@@ -39,8 +39,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.44"
-          memory: "162MB"
+          cpus: "0.45"
+          memory: "165MB"
 
   api2:
     image: jotahenrique/fraud-detection:v1.11.0
@@ -62,37 +62,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.44"
-          memory: "162MB"
-
-  warmup:
-    image: curlimages/curl:8.10.1
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        BASE=http://nginx:9999
-        i=0; while [ $$i -lt 240 ]; do
-          curl -fsS --max-time 1 $$BASE/ready >/dev/null 2>&1 && break
-          sleep 0.25; i=$$((i+1))
-        done
-        p1='{"id":"w-01","transaction":{"amount":42.10,"installments":1,"requested_at":"2026-03-11T00:15:23Z"},"customer":{"avg_amount":85.50,"tx_count_24h":2,"known_merchants":["MERC-001"]},"merchant":{"id":"MERC-001","mcc":"5411","avg_amount":52.30},"terminal":{"is_online":false,"card_present":true,"km_from_home":2.1},"last_transaction":null}'
-        p2='{"id":"w-02","transaction":{"amount":5500.00,"installments":10,"requested_at":"2026-03-14T22:05:18Z"},"customer":{"avg_amount":80.25,"tx_count_24h":15,"known_merchants":["MERC-001"]},"merchant":{"id":"MERC-999","mcc":"7801","avg_amount":4200.00},"terminal":{"is_online":true,"card_present":false,"km_from_home":700.0},"last_transaction":{"timestamp":"2026-03-14T21:30:00Z","km_from_current":500.0}}'
-        i=1; while [ $$i -le 120 ]; do
-          if [ $$((i % 2)) -eq 0 ]; then body=$$p2; else body=$$p1; fi
-          curl -fsS --max-time 2 -H 'content-type: application/json' -d "$$body" $$BASE/fraud-score >/dev/null 2>&1
-          i=$$((i+1))
-        done
-        echo "warmup done"
-    depends_on:
-      - nginx
-    networks:
-      - rinha
-    restart: "no"
-    deploy:
-      resources:
-        limits:
-          cpus: "0.02"
-          memory: "6MB"
+          cpus: "0.45"
+          memory: "165MB"
 
 volumes:
   sockets:
